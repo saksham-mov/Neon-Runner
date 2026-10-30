@@ -1,0 +1,6 @@
+{
+  "name": "Neon Subway Runner",
+  "description": "A self-contained 3D endless runner in a futuristic neon subway with smooth lane switching, low-poly aesthetics, and dynamic obstacles.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

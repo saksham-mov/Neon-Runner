@@ -1,0 +1,1868 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>Neon Subway Runner - 3D Endless Runner</title>
+  <meta name="description" content="A self-contained 3D endless runner in a futuristic neon subway with smooth lane switching, low-poly aesthetics, and dynamic obstacles." />
+  <meta property="og:title" content="Neon Subway Runner - 3D Endless Runner" />
+  <meta property="og:description" content="A self-contained 3D endless runner in a futuristic neon subway with smooth lane switching, low-poly aesthetics, and dynamic obstacles." />
+  <meta property="og:type" content="website" />
+  <meta name="twitter:card" content="summary_large_image" />
+
+  <!-- Import map pinning Three.js to release r170 -->
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.170.0/build/three.module.js"
+    }
+  }
+  </script>
+
+  <style>
+    /* ==========================================================================
+       GLOBAL & HUD STYLES
+       ========================================================================== */
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    body, html {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: #04060e;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      color: #ffffff;
+    }
+
+    #canvas-container {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+    }
+
+    /* Vignette speed overlay */
+    #speed-vignette {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 5;
+      background: radial-gradient(circle, transparent 55%, rgba(0, 243, 255, 0.1) 100%);
+      opacity: 0.5;
+      transition: opacity 0.3s ease;
+    }
+
+    /* HUD Layer */
+    #hud {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 10;
+      pointer-events: none;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 24px;
+    }
+
+    .hud-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      width: 100%;
+    }
+
+    .stat-badge {
+      background: rgba(8, 12, 24, 0.85);
+      border: 1px solid rgba(0, 243, 255, 0.45);
+      border-radius: 10px;
+      padding: 12px 20px;
+      box-shadow: 0 4px 25px rgba(0, 0, 0, 0.65), inset 0 0 12px rgba(0, 243, 255, 0.12);
+      backdrop-filter: blur(8px);
+    }
+
+    .stat-label {
+      font-size: 11px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: #00f3ff;
+      font-weight: 700;
+      margin-bottom: 2px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .stat-label-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #00f3ff;
+      box-shadow: 0 0 8px #00f3ff;
+    }
+
+    .stat-value {
+      font-size: 30px;
+      font-weight: 800;
+      letter-spacing: 1px;
+      color: #ffffff;
+      text-shadow: 0 0 14px rgba(0, 243, 255, 0.7);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .stat-sub {
+      font-size: 12px;
+      color: #8f9bb3;
+      margin-top: 3px;
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .speed-gauge {
+      border-color: rgba(255, 0, 127, 0.45);
+      box-shadow: 0 4px 25px rgba(0, 0, 0, 0.65), inset 0 0 12px rgba(255, 0, 127, 0.15);
+      text-align: right;
+    }
+
+    .speed-gauge .stat-label {
+      color: #ff007f;
+      justify-content: flex-end;
+    }
+
+    .speed-gauge .stat-label-dot {
+      background: #ff007f;
+      box-shadow: 0 0 8px #ff007f;
+    }
+
+    .speed-gauge .stat-value {
+      color: #ff85be;
+      text-shadow: 0 0 14px rgba(255, 0, 127, 0.7);
+    }
+
+    /* Controls tip at bottom */
+    .controls-tip {
+      align-self: center;
+      background: rgba(8, 12, 24, 0.75);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 24px;
+      padding: 9px 22px;
+      font-size: 13px;
+      color: #c4d1eb;
+      letter-spacing: 0.5px;
+      backdrop-filter: blur(6px);
+      display: flex;
+      gap: 14px;
+      align-items: center;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+    }
+
+    .key-cap {
+      display: inline-block;
+      background: rgba(255, 255, 255, 0.14);
+      border: 1px solid rgba(255, 255, 255, 0.35);
+      border-radius: 4px;
+      padding: 2px 8px;
+      font-size: 11px;
+      font-weight: 700;
+      color: #ffffff;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+    }
+
+    /* Sound button */
+    .audio-toggle {
+      pointer-events: auto;
+      cursor: pointer;
+      background: rgba(14, 19, 36, 0.8);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 8px;
+      padding: 7px 12px;
+      color: #ffffff;
+      font-size: 12px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s ease;
+      margin-top: 8px;
+    }
+
+    .audio-toggle:hover {
+      border-color: #00f3ff;
+      background: rgba(0, 243, 255, 0.2);
+      box-shadow: 0 0 10px rgba(0, 243, 255, 0.3);
+    }
+
+    .music-track-info {
+      font-size: 10px;
+      color: #8c9bb5;
+      letter-spacing: 0.5px;
+      margin-top: 6px;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      justify-content: flex-end;
+      opacity: 0.85;
+      max-width: 170px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .music-track-info span {
+      color: #00f3ff;
+    }
+
+    /* Touch on-screen buttons for mobile devices */
+    .touch-controls {
+      display: none;
+      pointer-events: auto;
+      position: absolute;
+      bottom: 24px;
+      width: calc(100% - 48px);
+      left: 24px;
+      justify-content: space-between;
+      z-index: 15;
+    }
+
+    .touch-btn {
+      width: 70px;
+      height: 70px;
+      border-radius: 50%;
+      background: rgba(8, 12, 24, 0.85);
+      border: 2px solid #00f3ff;
+      color: #00f3ff;
+      font-size: 26px;
+      font-weight: 900;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      box-shadow: 0 0 18px rgba(0, 243, 255, 0.45);
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .touch-btn:active {
+      background: rgba(0, 243, 255, 0.35);
+      transform: scale(0.95);
+    }
+
+    @media (hover: none) and (pointer: coarse) {
+      .touch-controls {
+        display: flex;
+      }
+      .controls-tip {
+        display: none;
+      }
+    }
+
+    /* Game Over Modal */
+    #game-over-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 20;
+      background: rgba(4, 6, 14, 0.88);
+      backdrop-filter: blur(12px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+      pointer-events: auto;
+    }
+
+    #game-over-overlay.visible {
+      display: flex;
+      opacity: 1;
+    }
+
+    .game-over-card {
+      background: linear-gradient(135deg, rgba(15, 22, 44, 0.96), rgba(7, 10, 22, 0.98));
+      border: 1px solid rgba(0, 243, 255, 0.45);
+      border-radius: 18px;
+      padding: 34px 42px;
+      text-align: center;
+      max-width: 450px;
+      width: 90%;
+      box-shadow: 0 0 60px rgba(0, 243, 255, 0.28), 0 12px 45px rgba(0, 0, 0, 0.85);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .game-over-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 4px;
+      background: linear-gradient(90deg, #ff007f, #00f3ff, #ffaa00);
+    }
+
+    .game-over-title {
+      font-size: 26px;
+      font-weight: 900;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: #ff007f;
+      text-shadow: 0 0 16px rgba(255, 0, 127, 0.75);
+      margin-bottom: 4px;
+    }
+
+    .game-over-subtitle {
+      font-size: 13px;
+      color: #8c9bb5;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      margin-bottom: 22px;
+    }
+
+    .final-score-box {
+      background: rgba(0, 0, 0, 0.4);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 20px;
+    }
+
+    .final-score-label {
+      font-size: 11px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: #00f3ff;
+      font-weight: 700;
+    }
+
+    .final-score-number {
+      font-size: 42px;
+      font-weight: 900;
+      color: #ffffff;
+      text-shadow: 0 0 22px rgba(0, 243, 255, 0.75);
+      line-height: 1.1;
+      margin: 4px 0;
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 24px;
+      font-size: 13px;
+      color: #a4b3d1;
+    }
+
+    .stat-item {
+      background: rgba(255, 255, 255, 0.05);
+      padding: 9px 12px;
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      text-align: left;
+    }
+
+    .stat-item .label {
+      font-size: 10px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: #7b8ba8;
+      display: block;
+      margin-bottom: 3px;
+    }
+
+    .stat-item .val {
+      font-size: 16px;
+      font-weight: 800;
+      color: #ffffff;
+    }
+
+    .restart-btn {
+      width: 100%;
+      padding: 14px 24px;
+      background: linear-gradient(90deg, #00c6ff, #0072ff);
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: 800;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: #ffffff;
+      cursor: pointer;
+      box-shadow: 0 0 28px rgba(0, 198, 255, 0.55);
+      transition: all 0.2s ease;
+      outline: none;
+    }
+
+    .restart-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 0 38px rgba(0, 198, 255, 0.85);
+      background: linear-gradient(90deg, #00dbff, #0088ff);
+    }
+
+    .restart-btn:active {
+      transform: translateY(0);
+    }
+
+    .restart-tip {
+      font-size: 12px;
+      color: #6d7c99;
+      margin-top: 14px;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- WebGL Render Container -->
+  <div id="canvas-container"></div>
+  <div id="speed-vignette"></div>
+
+  <!-- HUD Layer -->
+  <div id="hud">
+    <div class="hud-header">
+      <div class="stat-badge">
+        <div class="stat-label">
+          <span class="stat-label-dot"></span>
+          Distance & Score
+        </div>
+        <div id="hud-score" class="stat-value">0 pts</div>
+        <div class="stat-sub">
+          <span id="hud-distance">0.0 m</span>
+          <span>•</span>
+          <span id="hud-highscore">BEST: 0 pts</span>
+        </div>
+      </div>
+
+      <div class="speed-gauge stat-badge">
+        <div class="stat-label">
+          Velocity Gauge
+          <span class="stat-label-dot"></span>
+        </div>
+        <div id="hud-speed" class="stat-value">32</div>
+        <div id="hud-speed-sub" class="stat-sub" style="justify-content: flex-end;">
+          <span>KM/H</span>
+          <span>(8.9 m/s)</span>
+        </div>
+        <button id="audio-btn" class="audio-toggle" title="Toggle Sound">
+          <span id="audio-icon">🔊</span> Music & SFX
+        </button>
+        <div class="music-track-info" title="Now Playing: Toward the Hidden Horizon">
+          <span>🎵</span> Toward the Hidden Horizon
+        </div>
+      </div>
+    </div>
+
+    <div class="controls-tip">
+      <span><span class="key-cap">A</span> or <span class="key-cap">←</span> Move Left</span>
+      <span>•</span>
+      <span><span class="key-cap">D</span> or <span class="key-cap">→</span> Move Right</span>
+    </div>
+
+    <!-- On-screen touch buttons for mobile devices -->
+    <div class="touch-controls">
+      <button id="btn-left" class="touch-btn" aria-label="Left">◀</button>
+      <button id="btn-right" class="touch-btn" aria-label="Right">▶</button>
+    </div>
+  </div>
+
+  <!-- Game Over Screen -->
+  <div id="game-over-overlay">
+    <div class="game-over-card">
+      <div class="game-over-title">Run Terminated</div>
+      <div class="game-over-subtitle">Subway System Collision</div>
+
+      <div class="final-score-box">
+        <div class="final-score-label">Final Distance Score</div>
+        <div id="game-over-score" class="final-score-number">0</div>
+        <div id="new-high-badge" style="display: none; color: #ffaa00; font-size: 12px; font-weight: 700; letter-spacing: 1px; margin-top: 4px;">★ NEW HIGH RECORD ★</div>
+      </div>
+
+      <div class="stats-grid">
+        <div class="stat-item">
+          <span class="label">Exact Distance</span>
+          <span id="game-over-dist" class="val">0.0 m</span>
+        </div>
+        <div class="stat-item">
+          <span class="label">Time Survived</span>
+          <span id="game-over-time" class="val">0.0 s</span>
+        </div>
+        <div class="stat-item">
+          <span class="label">Top Velocity</span>
+          <span id="game-over-speed" class="val">32 km/h</span>
+        </div>
+        <div class="stat-item">
+          <span class="label">Average Velocity</span>
+          <span id="game-over-avg" class="val">32 km/h</span>
+        </div>
+      </div>
+
+      <button id="restart-btn" class="restart-btn">Restart Run</button>
+      <div class="restart-tip">Press <span class="key-cap">R</span> or <span class="key-cap">Space</span> to restart</div>
+    </div>
+  </div>
+
+  <!-- ==========================================================================
+       MAIN JAVASCRIPT GAME CODE
+       ========================================================================== -->
+  <script type="module">
+    /* ==========================================================================
+       TABLE OF CONTENTS & ARCHITECTURAL OVERVIEW
+       --------------------------------------------------------------------------
+       This self-contained 3D endless runner is organized into 10 structured
+       sections in the exact order requested:
+
+       1.  CONFIG       - Named tunable constants, physical aerodynamics & kinematics
+       2.  INIT         - Scene, camera, WebGL renderer, resize handler, lighting
+       3.  WORLD        - Elevated neon subway viaduct passing through a towering
+                          cyberpunk metropolis: illuminated skyscrapers, window
+                          grids, rooftop antennas, billboards, skybridges & dust
+       4.  PLAYER       - Articulated cyberpunk runner with organic biomechanical
+                          running gait, articulated knees/elbows, thruster flares
+       5.  OBSTACLES    - 3 unique 3D obstacle models (crates, lasers, trains),
+                          safe procedural spawn generator & object pooling
+       6.  GAME LOOP    - Delta-time step, realistic asymptotic acceleration,
+                          world scrolling, warp dust streaming, camera speed-FOV
+       7.  COLLISIONS   - Bounding-volume collision detection & crash feedback
+       8.  INPUT        - Keyboard (A/D, arrows, R) and touch/swipe handlers
+       9.  UI           - HUD updater, high score persistence & Game Over modal
+       10. RESTART      - Complete state reset & run reinitialization
+       ========================================================================== */
+
+    import * as THREE from 'three';
+
+    /* ==========================================================================
+       1. CONFIG
+       Every tunable number lives here as a named constant.
+       Physics follows real metric units: 1 Three.js unit = 1.0 meter.
+       ========================================================================== */
+    const CONFIG = {
+      // Lane Positions & Switching (in meters)
+      LANE_POSITIONS: [-2.0, 0.0, 2.0], // 3 subway tracks at x = -2m, 0m, +2m
+      DEFAULT_LANE_INDEX: 1,            // Start in middle lane (x = 0)
+      LANE_CHANGE_DURATION: 0.15,       // Duration of lane change animation in seconds
+      PLAYER_TILT_ANGLE: 0.22,          // Maximum roll/lean angle (radians) during lane change
+      PLAYER_YAW_ANGLE: 0.16,           // Maximum yaw steering angle during lane change
+
+      // Physically Grounded Aerodynamics & Kinematics
+      START_SPEED: 32.0,                // Initial speed in km/h (= 8.89 m/s). 2s run = ~18m!
+      MAX_SPEED: 82.0,                  // Terminal velocity ceiling in km/h (= 22.78 m/s)
+      SPEED_INCREASE_RATE: 1.4,         // Peak base acceleration in km/h per second
+
+      // Spawning & Difficulty (in meters)
+      OBSTACLE_SPAWN_DISTANCE: 95.0,    // Distance ahead where obstacles spawn (in meters)
+      MIN_OBSTACLE_GAP: 16.0,           // Minimum distance between consecutive obstacles (meters)
+      MAX_OBSTACLE_GAP: 32.0,           // Maximum distance between consecutive obstacles (meters)
+      OBSTACLE_DESPAWN_Z: 10.0,         // Z position behind camera where obstacles are recycled
+      SCORE_RATE: 10.0,                 // Score points accumulated per meter traveled
+
+      // World Geometry & Metropolis Cityscape (1 unit = 1 meter)
+      TRACK_SEGMENT_LENGTH: 24.0,       // Length of each modular tunnel/viaduct segment in meters
+      TRACK_SEGMENT_COUNT: 9,           // Total segments recycled along the track (216 meters span)
+      CITY_BUILDINGS_PER_SIDE: 3,       // Buildings placed on each side per segment
+      MIN_BUILDING_HEIGHT: 24.0,        // Minimum skyscraper height (meters)
+      MAX_BUILDING_HEIGHT: 65.0,        // Maximum skyscraper height (meters)
+      BUILDING_OFFSET_X: 12.0,          // Distance from track center to inner building edge
+      FOG_NEAR: 35.0,                   // Distance where atmospheric fog begins (meters)
+      FOG_FAR: 145.0,                   // Distance where atmospheric fog obscures view (meters)
+      FOG_COLOR: 0x050814,              // Deep midnight cyberpunk indigo
+
+      // Camera & Speed FOV
+      BASE_CAMERA_FOV: 60.0,            // Base camera field of view at start speed
+      MAX_CAMERA_FOV: 74.0,             // Expanded FOV at maximum speed (warp rush feel)
+      CAMERA_OFFSET: new THREE.Vector3(0, 3.0, 5.6), // Camera position behind and above runner
+      CAMERA_LOOK_OFFSET: new THREE.Vector3(0, 1.3, -7.0), // Target point camera aims toward
+      CAMERA_SMOOTH_FACTOR: 14.0,       // Camera horizontal following stiffness
+
+      // Biomechanical Runner Animation Parameters
+      BASE_STRIDE_FREQUENCY: 3.0,       // Base strides per second at start speed
+      STRIDE_VELOCITY_SCALE: 0.12,      // Increase in stride frequency per m/s of speed
+      PLAYER_BOB_AMPLITUDE: 0.07,       // Vertical displacement of the running bob
+
+      // Neon Color Palette
+      COLORS: {
+        BACKGROUND: 0x050814,
+        CYAN_NEON: 0x00f3ff,
+        MAGENTA_NEON: 0xff007f,
+        AMBER_NEON: 0xffaa00,
+        PURPLE_NEON: 0x8a2be2,
+        RAILS: 0x768fae,
+        GROUND: 0x090d18,
+        BUILDING_DARK: 0x0c111f,
+        BUILDING_TRIM: 0x141b30
+      },
+
+      // Background Music Settings
+      BGM_PATH: '/assets/aistudio/Toward_the_Hidden_Horizon_e18005c9.mp3',
+      BGM_VOLUME: 0.38
+    };
+
+    /* ==========================================================================
+       2. INIT (Scene, Camera, Renderer, Lights)
+       ========================================================================== */
+    const container = document.getElementById('canvas-container');
+    const speedVignette = document.getElementById('speed-vignette');
+
+    // Scene with atmospheric cyberpunk skyline fog
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(CONFIG.COLORS.BACKGROUND);
+    scene.fog = new THREE.Fog(CONFIG.FOG_COLOR, CONFIG.FOG_NEAR, CONFIG.FOG_FAR);
+
+    // Camera setup with dynamic speed-responsive FOV
+    const camera = new THREE.PerspectiveCamera(
+      CONFIG.BASE_CAMERA_FOV,
+      window.innerWidth / window.innerHeight,
+      0.1,
+      260.0
+    );
+    camera.position.set(0, CONFIG.CAMERA_OFFSET.y, CONFIG.CAMERA_OFFSET.z);
+
+    // WebGL Renderer with High-Performance Tone Mapping
+    const renderer = new THREE.WebGLRenderer({
+      antialias: true,
+      powerPreference: 'high-performance'
+    });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.3;
+    container.appendChild(renderer.domElement);
+
+    // Responsive window resizing
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    // Lighting: Multi-point cyberpunk metropolis illumination
+    const ambientLight = new THREE.AmbientLight(0x11172a, 1.4);
+    scene.add(ambientLight);
+
+    const hemiLight = new THREE.HemisphereLight(0x00f3ff, 0x050814, 0.95);
+    scene.add(hemiLight);
+
+    const keyLight = new THREE.DirectionalLight(0xffffff, 1.6);
+    keyLight.position.set(10, 22, 12);
+    scene.add(keyLight);
+
+    const citySkylineLight = new THREE.DirectionalLight(0xff007f, 1.5);
+    citySkylineLight.position.set(-12, 16, -20);
+    scene.add(citySkylineLight);
+
+    /* ==========================================================================
+       3. WORLD (Elevated Neon Subway Viaduct & Cyberpunk Metropolis)
+       A breathtaking skyline world:
+       - Elevated track running above a vast cyberpunk metropolis at night
+       - Towering skyscrapers with illuminated window matrices & glowing rooftop crowns
+       - Rooftop communications spires, beacon spheres & holographic billboards
+       - Overhead skybridges connecting towers across the urban canyon
+       - Elevated viaduct railings, glowing neon track dividers, and illuminated rails
+       - Floating neon warp dust particles streaming through the city air
+       ========================================================================== */
+    const trackSegments = [];
+
+    // Shared high-performance materials (Zero GC in loop)
+    const materials = {
+      ground: new THREE.MeshStandardMaterial({
+        color: CONFIG.COLORS.GROUND,
+        roughness: 0.8,
+        metalness: 0.3
+      }),
+      rails: new THREE.MeshStandardMaterial({
+        color: CONFIG.COLORS.RAILS,
+        roughness: 0.15,
+        metalness: 0.95
+      }),
+      sleepers: new THREE.MeshStandardMaterial({
+        color: 0x121624,
+        roughness: 0.85,
+        metalness: 0.2
+      }),
+      viaductPillar: new THREE.MeshStandardMaterial({
+        color: 0x0a0e1b,
+        roughness: 0.7,
+        metalness: 0.4
+      }),
+      buildingFacade: new THREE.MeshStandardMaterial({
+        color: CONFIG.COLORS.BUILDING_DARK,
+        roughness: 0.5,
+        metalness: 0.7
+      }),
+      buildingTrim: new THREE.MeshStandardMaterial({
+        color: CONFIG.COLORS.BUILDING_TRIM,
+        roughness: 0.3,
+        metalness: 0.8
+      }),
+      cyanNeon: new THREE.MeshBasicMaterial({
+        color: CONFIG.COLORS.CYAN_NEON
+      }),
+      magentaNeon: new THREE.MeshBasicMaterial({
+        color: CONFIG.COLORS.MAGENTA_NEON
+      }),
+      amberNeon: new THREE.MeshBasicMaterial({
+        color: CONFIG.COLORS.AMBER_NEON
+      }),
+      purpleNeon: new THREE.MeshBasicMaterial({
+        color: CONFIG.COLORS.PURPLE_NEON
+      }),
+      darkMetal: new THREE.MeshStandardMaterial({
+        color: 0x080c16,
+        roughness: 0.35,
+        metalness: 0.85
+      })
+    };
+
+    /**
+     * Builds a single cyberpunk skyscraper with glowing windows, rooftop crown,
+     * neon facade stripes, and communications antennas.
+     */
+    function createCyberSkyscraper(width, depth, height, xPos, zOffset, themeColor) {
+      const bGroup = new THREE.Group();
+      bGroup.position.set(xPos, 0, zOffset);
+
+      // 1. Skyscraper Main Body
+      const bodyGeo = new THREE.BoxGeometry(width, height, depth);
+      const bodyMesh = new THREE.Mesh(bodyGeo, materials.buildingFacade);
+      bodyMesh.position.y = height / 2 - 2.0; // Anchored slightly below viaduct level
+      bGroup.add(bodyMesh);
+
+      // 2. Glowing Rooftop Crown Trim
+      const crownGeo = new THREE.BoxGeometry(width + 0.3, 0.4, depth + 0.3);
+      const crownMesh = new THREE.Mesh(crownGeo, themeColor);
+      crownMesh.position.y = height - 1.8;
+      bGroup.add(crownMesh);
+
+      // 3. Facade Vertical Neon Energy Accents
+      const accentGeo = new THREE.BoxGeometry(0.12, height * 0.85, 0.12);
+      const accentMesh = new THREE.Mesh(accentGeo, themeColor);
+      const facingDirection = xPos < 0 ? 1 : -1;
+      accentMesh.position.set(facingDirection * (width / 2 + 0.08), height * 0.45, 0);
+      bGroup.add(accentMesh);
+
+      // 4. Procedural Glowing Window Matrix Strips (Facing the subway tracks)
+      const windowRows = Math.floor(height / 3.8);
+      const winGeo = new THREE.BoxGeometry(0.08, 0.45, depth * 0.65);
+      const winMat = (themeColor === materials.cyanNeon) ? materials.cyanNeon : materials.amberNeon;
+
+      for (let r = 1; r < windowRows; r++) {
+        if (r % 2 === 0) continue; // Elegant alternating bands
+        const winMesh = new THREE.Mesh(winGeo, winMat);
+        winMesh.position.set(facingDirection * (width / 2 + 0.05), r * 3.8, 0);
+        bGroup.add(winMesh);
+      }
+
+      // 5. Rooftop Communications Spire & Flashing Beacon
+      if (height > 35.0) {
+        const spireGeo = new THREE.CylinderGeometry(0.1, 0.25, 6.0, 6);
+        const spireMesh = new THREE.Mesh(spireGeo, materials.darkMetal);
+        spireMesh.position.set(0, height + 1.2, 0);
+        bGroup.add(spireMesh);
+
+        const beaconGeo = new THREE.SphereGeometry(0.35, 8, 8);
+        const beaconMesh = new THREE.Mesh(beaconGeo, materials.magentaNeon);
+        beaconMesh.position.set(0, height + 4.3, 0);
+        bGroup.add(beaconMesh);
+      }
+
+      // 6. Rooftop Holographic Billboard / Neon Logo Box
+      if (height >= 28.0 && Math.random() < 0.6) {
+        const boardGeo = new THREE.BoxGeometry(width * 0.6, 2.2, 0.3);
+        const boardFrame = new THREE.Mesh(boardGeo, materials.darkMetal);
+        boardFrame.position.set(0, height - 0.5, depth / 2 + 0.2);
+
+        const boardNeonGeo = new THREE.BoxGeometry(width * 0.52, 1.6, 0.35);
+        const boardNeon = new THREE.Mesh(boardNeonGeo, (Math.random() < 0.5) ? materials.magentaNeon : materials.cyanNeon);
+        boardNeon.position.set(0, height - 0.5, depth / 2 + 0.2);
+
+        bGroup.add(boardFrame);
+        bGroup.add(boardNeon);
+      }
+
+      return bGroup;
+    }
+
+    /**
+     * Builds a single modular viaduct & cityscape segment
+     */
+    function createSubwaySegment(zPos, segmentIndex) {
+      const segment = new THREE.Group();
+      const length = CONFIG.TRACK_SEGMENT_LENGTH;
+
+      // 1. Viaduct Roadbed (Elevated track slab)
+      const roadbedGeo = new THREE.BoxGeometry(7.8, 0.5, length);
+      const roadbed = new THREE.Mesh(roadbedGeo, materials.ground);
+      roadbed.position.set(0, -0.25, 0);
+      segment.add(roadbed);
+
+      // Deep viaduct under-girder structure
+      const girderGeo = new THREE.BoxGeometry(6.4, 1.8, length);
+      const girder = new THREE.Mesh(girderGeo, materials.viaductPillar);
+      girder.position.set(0, -1.35, 0);
+      segment.add(girder);
+
+      // 2. Track Sleepers (Cross ties spaced along segment)
+      const sleeperGeo = new THREE.BoxGeometry(6.8, 0.08, 0.45);
+      const sleeperStep = 1.8;
+      for (let z = -length / 2 + sleeperStep / 2; z < length / 2; z += sleeperStep) {
+        const sleeper = new THREE.Mesh(sleeperGeo, materials.sleepers);
+        sleeper.position.set(0, 0.02, z);
+        segment.add(sleeper);
+      }
+
+      // 3. Polished Steel Rails with glowing Under-Rail Neon
+      const railGeo = new THREE.BoxGeometry(0.08, 0.12, length);
+      const railGlowGeo = new THREE.BoxGeometry(0.04, 0.02, length);
+
+      CONFIG.LANE_POSITIONS.forEach((laneX) => {
+        // Left Rail of lane
+        const leftRail = new THREE.Mesh(railGeo, materials.rails);
+        leftRail.position.set(laneX - 0.45, 0.08, 0);
+        segment.add(leftRail);
+
+        const leftGlow = new THREE.Mesh(railGlowGeo, materials.cyanNeon);
+        leftGlow.position.set(laneX - 0.45, 0.015, 0);
+        segment.add(leftGlow);
+
+        // Right Rail of lane
+        const rightRail = new THREE.Mesh(railGeo, materials.rails);
+        rightRail.position.set(laneX + 0.45, 0.08, 0);
+        segment.add(rightRail);
+
+        const rightGlow = new THREE.Mesh(railGlowGeo, materials.cyanNeon);
+        rightGlow.position.set(laneX + 0.45, 0.015, 0);
+        segment.add(rightGlow);
+      });
+
+      // 4. Glowing Neon Lane Dividers & Outer Boundary Lines
+      const neonDividerGeo = new THREE.BoxGeometry(0.05, 0.03, length);
+      const dividerXPositions = [-3.2, -1.0, 1.0, 3.2];
+      dividerXPositions.forEach((xPos, idx) => {
+        const isOuter = (idx === 0 || idx === 3);
+        const neonStrip = new THREE.Mesh(
+          neonDividerGeo,
+          isOuter ? materials.magentaNeon : materials.cyanNeon
+        );
+        neonStrip.position.set(xPos, 0.025, 0);
+        segment.add(neonStrip);
+      });
+
+      // 5. Elevated Viaduct Side Energy Railings & Safety Parapets
+      const parapetGeo = new THREE.BoxGeometry(0.24, 0.85, length);
+      const railGlowStripGeo = new THREE.BoxGeometry(0.06, 0.08, length);
+
+      // Left Parapet
+      const leftParapet = new THREE.Mesh(parapetGeo, materials.darkMetal);
+      leftParapet.position.set(-3.85, 0.35, 0);
+      segment.add(leftParapet);
+
+      const leftTopGlow = new THREE.Mesh(railGlowStripGeo, materials.cyanNeon);
+      leftTopGlow.position.set(-3.85, 0.8, 0);
+      segment.add(leftTopGlow);
+
+      // Right Parapet
+      const rightParapet = new THREE.Mesh(parapetGeo, materials.darkMetal);
+      rightParapet.position.set(3.85, 0.35, 0);
+      segment.add(rightParapet);
+
+      const rightTopGlow = new THREE.Mesh(railGlowStripGeo, materials.cyanNeon);
+      rightTopGlow.position.set(3.85, 0.8, 0);
+      segment.add(rightTopGlow);
+
+      // 6. Overhead Cantilever Gantry Arches
+      const gantryGroup = new THREE.Group();
+      gantryGroup.position.set(0, 0, 0);
+
+      const archColGeo = new THREE.BoxGeometry(0.4, 4.8, 0.5);
+      const leftArchCol = new THREE.Mesh(archColGeo, materials.darkMetal);
+      leftArchCol.position.set(-4.0, 2.2, 0);
+      gantryGroup.add(leftArchCol);
+
+      const rightArchCol = new THREE.Mesh(archColGeo, materials.darkMetal);
+      rightArchCol.position.set(4.0, 2.2, 0);
+      gantryGroup.add(rightArchCol);
+
+      const archTopGeo = new THREE.BoxGeometry(8.6, 0.35, 0.5);
+      const archTop = new THREE.Mesh(archTopGeo, materials.darkMetal);
+      archTop.position.set(0, 4.5, 0);
+      gantryGroup.add(archTop);
+
+      const archNeonGeo = new THREE.BoxGeometry(8.0, 0.08, 0.08);
+      const archNeon = new THREE.Mesh(archNeonGeo, materials.magentaNeon);
+      archNeon.position.set(0, 4.3, 0);
+      gantryGroup.add(archNeon);
+
+      // Subway Digital Route Signboard
+      const signBoardGeo = new THREE.BoxGeometry(2.4, 0.45, 0.14);
+      const signBoard = new THREE.Mesh(signBoardGeo, materials.darkMetal);
+      signBoard.position.set(0, 3.95, 0);
+
+      const signColor = (segmentIndex % 2 === 0) ? materials.cyanNeon : materials.amberNeon;
+      const signScreenGeo = new THREE.BoxGeometry(2.2, 0.32, 0.16);
+      const signScreen = new THREE.Mesh(signScreenGeo, signColor);
+      signScreen.position.set(0, 3.95, 0);
+
+      gantryGroup.add(signBoard);
+      gantryGroup.add(signScreen);
+      segment.add(gantryGroup);
+
+      // 7. SURROUNDING NEON SKYSCRAPERS & CITYSCAPE
+      // Left and right metropolitan building clusters
+      const sideOffsets = [
+        { side: -1, xBase: -CONFIG.BUILDING_OFFSET_X },
+        { side: 1, xBase: CONFIG.BUILDING_OFFSET_X }
+      ];
+
+      sideOffsets.forEach((sideInfo) => {
+        const count = CONFIG.CITY_BUILDINGS_PER_SIDE;
+        const zStep = length / count;
+
+        for (let b = 0; b < count; b++) {
+          const zOffset = -length / 2 + zStep * b + zStep * 0.5;
+
+          // Pseudo-random varied dimensions based on segment & building index
+          const seed = Math.sin(segmentIndex * 17.3 + b * 29.7 + sideInfo.side * 13.1);
+          const height = CONFIG.MIN_BUILDING_HEIGHT + Math.abs(seed) * (CONFIG.MAX_BUILDING_HEIGHT - CONFIG.MIN_BUILDING_HEIGHT);
+          const width = 6.0 + (Math.abs(seed * 7.0) % 4.5);
+          const depth = 6.5 + (Math.abs(seed * 11.0) % 5.0);
+
+          // Position building so its front facade faces the elevated tracks
+          const posX = sideInfo.xBase + sideInfo.side * (width / 2 + (Math.abs(seed * 5.0) % 6.0));
+
+          // Theme colors
+          const colorPick = (Math.abs(seed * 100) % 3 < 1.2) ? materials.cyanNeon : materials.magentaNeon;
+
+          const building = createCyberSkyscraper(width, depth, height, posX, zOffset, colorPick);
+          segment.add(building);
+        }
+      });
+
+      // 8. Overhead High-Altitude Skybridge (Connecting towers across the city canyon)
+      if (segmentIndex % 3 === 0) {
+        const skybridgeHeight = 22.0;
+        const bridgeGeo = new THREE.BoxGeometry(32.0, 2.5, 3.2);
+        const bridgeMesh = new THREE.Mesh(bridgeGeo, materials.darkMetal);
+        bridgeMesh.position.set(0, skybridgeHeight, 0);
+
+        const bridgeNeonGeo = new THREE.BoxGeometry(32.0, 0.2, 0.2);
+        const bridgeNeon = new THREE.Mesh(bridgeNeonGeo, materials.cyanNeon);
+        bridgeNeon.position.set(0, skybridgeHeight - 1.15, 1.65);
+
+        const bridgeNeon2 = new THREE.Mesh(bridgeNeonGeo, materials.cyanNeon);
+        bridgeNeon2.position.set(0, skybridgeHeight - 1.15, -1.65);
+
+        segment.add(bridgeMesh);
+        segment.add(bridgeNeon);
+        segment.add(bridgeNeon2);
+      }
+
+      segment.position.z = zPos;
+      scene.add(segment);
+      return segment;
+    }
+
+    // Populate initial world segments
+    const totalTrackLength = CONFIG.TRACK_SEGMENT_COUNT * CONFIG.TRACK_SEGMENT_LENGTH;
+    for (let i = 0; i < CONFIG.TRACK_SEGMENT_COUNT; i++) {
+      const zPos = 16.0 - i * CONFIG.TRACK_SEGMENT_LENGTH;
+      trackSegments.push(createSubwaySegment(zPos, i));
+    }
+
+    // 9. Floating Neon City Dust & Warp Particle Stream (Speed & depth feel)
+    const PARTICLE_COUNT = 200;
+    const particleGeometry = new THREE.BufferGeometry();
+    const particlePositions = new Float32Array(PARTICLE_COUNT * 3);
+    const particleColors = new Float32Array(PARTICLE_COUNT * 3);
+
+    const cyanC = new THREE.Color(CONFIG.COLORS.CYAN_NEON);
+    const magC = new THREE.Color(CONFIG.COLORS.MAGENTA_NEON);
+
+    for (let i = 0; i < PARTICLE_COUNT; i++) {
+      particlePositions[i * 3 + 0] = (Math.random() - 0.5) * 12.0; // Spans across track & city canyon
+      particlePositions[i * 3 + 1] = Math.random() * 6.5 + 0.3;   // Y: 0.3 to 6.8
+      particlePositions[i * 3 + 2] = -Math.random() * 135.0;     // Z: -135 to 0
+
+      const c = Math.random() < 0.65 ? cyanC : magC;
+      particleColors[i * 3 + 0] = c.r;
+      particleColors[i * 3 + 1] = c.g;
+      particleColors[i * 3 + 2] = c.b;
+    }
+
+    particleGeometry.setAttribute('position', new THREE.BufferAttribute(particlePositions, 3));
+    particleGeometry.setAttribute('color', new THREE.BufferAttribute(particleColors, 3));
+
+    const particleMaterial = new THREE.PointsMaterial({
+      size: 0.22,
+      vertexColors: true,
+      transparent: true,
+      opacity: 0.85,
+      blending: THREE.AdditiveBlending
+    });
+
+    const warpParticles = new THREE.Points(particleGeometry, particleMaterial);
+    scene.add(warpParticles);
+
+    /* ==========================================================================
+       4. PLAYER
+       Biomechanical Articulated Cyberpunk Runner:
+       - Multi-segmented limbs: Thighs, calves with bent knees, upper arms, forearms
+       - Natural sprinting gait: Two vertical bounce cycles per stride, hip yaw/roll sway
+       - Speed-adaptive forward torso lean and arm pumping
+       - Dual cyber jet thrusters on backpack with dynamic glowing particles!
+       - Spring-damped smooth lane changing with realistic banking roll and yaw
+       ========================================================================== */
+    const player = new THREE.Group();
+
+    let playerTorso, playerHead, playerVisor, playerBackpack;
+    let leftUpperArm, leftForearm, rightUpperArm, rightForearm;
+    let leftThigh, leftCalf, rightThigh, rightCalf;
+    let leftThrusterGlow, rightThrusterGlow;
+
+    function buildArticulatedPlayerModel() {
+      // 1. Torso Base
+      const torsoGeo = new THREE.BoxGeometry(0.56, 0.68, 0.34);
+      const torsoMat = new THREE.MeshStandardMaterial({
+        color: 0x161c2d,
+        roughness: 0.45,
+        metalness: 0.65
+      });
+      playerTorso = new THREE.Mesh(torsoGeo, torsoMat);
+      playerTorso.position.y = 0.95;
+      player.add(playerTorso);
+
+      // Neon chest power core & spine conduit
+      const chestStripeGeo = new THREE.BoxGeometry(0.14, 0.48, 0.04);
+      const chestStripe = new THREE.Mesh(chestStripeGeo, materials.cyanNeon);
+      chestStripe.position.set(0, 0.02, 0.18);
+      playerTorso.add(chestStripe);
+
+      // 2. Power Core Backpack with Dual Jet Thrusters
+      const packGeo = new THREE.BoxGeometry(0.42, 0.5, 0.22);
+      playerBackpack = new THREE.Mesh(packGeo, materials.darkMetal);
+      playerBackpack.position.set(0, 0.05, -0.24);
+      playerTorso.add(playerBackpack);
+
+      const coreNeonGeo = new THREE.BoxGeometry(0.2, 0.2, 0.04);
+      const coreNeon = new THREE.Mesh(coreNeonGeo, materials.magentaNeon);
+      coreNeon.position.set(0, 0, -0.12);
+      playerBackpack.add(coreNeon);
+
+      // Dual jet thruster nozzles with neon glowing flames
+      const nozzleGeo = new THREE.CylinderGeometry(0.06, 0.08, 0.16, 8);
+      const nozzleMat = new THREE.MeshStandardMaterial({ color: 0x222a3d, metalness: 0.9 });
+
+      const leftNozzle = new THREE.Mesh(nozzleGeo, nozzleMat);
+      leftNozzle.position.set(-0.14, -0.22, -0.06);
+      playerBackpack.add(leftNozzle);
+
+      const rightNozzle = new THREE.Mesh(nozzleGeo, nozzleMat);
+      rightNozzle.position.set(0.14, -0.22, -0.06);
+      playerBackpack.add(rightNozzle);
+
+      // Jet Thruster Exhaust Glow Flames
+      const flameGeo = new THREE.ConeGeometry(0.07, 0.28, 8);
+      flameGeo.rotateX(Math.PI);
+
+      leftThrusterGlow = new THREE.Mesh(flameGeo, materials.cyanNeon);
+      leftThrusterGlow.position.set(-0.14, -0.34, -0.06);
+      playerBackpack.add(leftThrusterGlow);
+
+      rightThrusterGlow = new THREE.Mesh(flameGeo, materials.cyanNeon);
+      rightThrusterGlow.position.set(0.14, -0.34, -0.06);
+      playerBackpack.add(rightThrusterGlow);
+
+      // 3. Head & Futuristic Cyber Visor
+      const headGeo = new THREE.BoxGeometry(0.38, 0.38, 0.38);
+      const headMat = new THREE.MeshStandardMaterial({
+        color: 0x0e1220,
+        roughness: 0.35,
+        metalness: 0.6
+      });
+      playerHead = new THREE.Mesh(headGeo, headMat);
+      playerHead.position.set(0, 0.56, 0);
+      playerTorso.add(playerHead);
+
+      const visorGeo = new THREE.BoxGeometry(0.36, 0.13, 0.1);
+      playerVisor = new THREE.Mesh(visorGeo, materials.cyanNeon);
+      playerVisor.position.set(0, 0.02, 0.18);
+      playerHead.add(playerVisor);
+
+      // 4. Articulated Arms (Shoulder Pivot -> Upper Arm -> Elbow Pivot -> Forearm)
+      const armMat = new THREE.MeshStandardMaterial({ color: 0x1f273d, roughness: 0.5 });
+      const upperArmGeo = new THREE.BoxGeometry(0.14, 0.32, 0.14);
+      const forearmGeo = new THREE.BoxGeometry(0.13, 0.3, 0.13);
+
+      // Left Arm
+      leftUpperArm = new THREE.Group();
+      leftUpperArm.position.set(-0.36, 0.26, 0);
+      const leftUpperMesh = new THREE.Mesh(upperArmGeo, armMat);
+      leftUpperMesh.position.y = -0.16;
+      leftUpperArm.add(leftUpperMesh);
+
+      leftForearm = new THREE.Group();
+      leftForearm.position.set(0, -0.32, 0);
+      const leftForearmMesh = new THREE.Mesh(forearmGeo, armMat);
+      leftForearmMesh.position.y = -0.15;
+      leftForearm.add(leftForearmMesh);
+      leftUpperArm.add(leftForearm);
+      playerTorso.add(leftUpperArm);
+
+      // Right Arm
+      rightUpperArm = new THREE.Group();
+      rightUpperArm.position.set(0.36, 0.26, 0);
+      const rightUpperMesh = new THREE.Mesh(upperArmGeo, armMat);
+      rightUpperMesh.position.y = -0.16;
+      rightUpperArm.add(rightUpperMesh);
+
+      rightForearm = new THREE.Group();
+      rightForearm.position.set(0, -0.32, 0);
+      const rightForearmMesh = new THREE.Mesh(forearmGeo, armMat);
+      rightForearmMesh.position.y = -0.15;
+      rightForearm.add(rightForearmMesh);
+      rightUpperArm.add(rightForearm);
+      playerTorso.add(rightUpperArm);
+
+      // 5. Articulated Legs (Hip Pivot -> Thigh -> Knee Pivot -> Calf & Sneaker)
+      const legMat = new THREE.MeshStandardMaterial({ color: 0x111625, roughness: 0.7 });
+      const thighGeo = new THREE.BoxGeometry(0.16, 0.34, 0.18);
+      const calfGeo = new THREE.BoxGeometry(0.15, 0.34, 0.16);
+
+      // Left Leg
+      leftThigh = new THREE.Group();
+      leftThigh.position.set(-0.16, -0.34, 0);
+      const leftThighMesh = new THREE.Mesh(thighGeo, legMat);
+      leftThighMesh.position.y = -0.17;
+      leftThigh.add(leftThighMesh);
+
+      leftCalf = new THREE.Group();
+      leftCalf.position.set(0, -0.34, 0);
+      const leftCalfMesh = new THREE.Mesh(calfGeo, legMat);
+      leftCalfMesh.position.y = -0.17;
+      leftCalf.add(leftCalfMesh);
+
+      // Glowing Sneaker Soles
+      const leftSoleGeo = new THREE.BoxGeometry(0.16, 0.05, 0.22);
+      const leftSole = new THREE.Mesh(leftSoleGeo, materials.cyanNeon);
+      leftSole.position.set(0, -0.34, 0.03);
+      leftCalf.add(leftSole);
+
+      leftThigh.add(leftCalf);
+      playerTorso.add(leftThigh);
+
+      // Right Leg
+      rightThigh = new THREE.Group();
+      rightThigh.position.set(0.16, -0.34, 0);
+      const rightThighMesh = new THREE.Mesh(thighGeo, legMat);
+      rightThighMesh.position.y = -0.17;
+      rightThigh.add(rightThighMesh);
+
+      rightCalf = new THREE.Group();
+      rightCalf.position.set(0, -0.34, 0);
+      const rightCalfMesh = new THREE.Mesh(calfGeo, legMat);
+      rightCalfMesh.position.y = -0.17;
+      rightCalf.add(rightCalfMesh);
+
+      const rightSoleGeo = new THREE.BoxGeometry(0.16, 0.05, 0.22);
+      const rightSole = new THREE.Mesh(rightSoleGeo, materials.cyanNeon);
+      rightSole.position.set(0, -0.34, 0.03);
+      rightCalf.add(rightSole);
+
+      rightThigh.add(rightCalf);
+      playerTorso.add(rightThigh);
+
+      // 6. Ground Shadow Disc
+      const shadowGeo = new THREE.PlaneGeometry(1.0, 1.3);
+      const shadowMat = new THREE.MeshBasicMaterial({
+        color: 0x000000,
+        transparent: true,
+        opacity: 0.6,
+        depthWrite: false
+      });
+      const shadow = new THREE.Mesh(shadowGeo, shadowMat);
+      shadow.rotation.x = -Math.PI / 2;
+      shadow.position.y = 0.03;
+      player.add(shadow);
+    }
+
+    buildArticulatedPlayerModel();
+    scene.add(player);
+
+    // Player State
+    const playerState = {
+      currentLane: CONFIG.DEFAULT_LANE_INDEX, // 0, 1, or 2
+      targetLane: CONFIG.DEFAULT_LANE_INDEX,
+      startX: CONFIG.LANE_POSITIONS[CONFIG.DEFAULT_LANE_INDEX],
+      targetX: CONFIG.LANE_POSITIONS[CONFIG.DEFAULT_LANE_INDEX],
+      transitionProgress: 1.0,
+      isChangingLane: false,
+      runStridePhase: 0.0,
+      boundingRadius: 0.45
+    };
+
+    player.position.set(CONFIG.LANE_POSITIONS[CONFIG.DEFAULT_LANE_INDEX], 0, 0);
+
+    /* ==========================================================================
+       5. OBSTACLES
+       Three visually distinct 3D obstacle models:
+       1. Crates (High-Tech Neon Shipping Containers with Hazard Chevrons)
+       2. Laser Barrier (Rotating Hazard Beacons & Pulsing Energy Beams)
+       3. Small Train Car (Automated Maglev Drone Rover with Illuminated Headlights)
+       ========================================================================== */
+    const OBSTACLE_TYPES = {
+      CRATES: 0,
+      BARRIER: 1,
+      TRAIN_CAR: 2
+    };
+
+    function createObstacleMesh(type) {
+      const group = new THREE.Group();
+
+      if (type === OBSTACLE_TYPES.CRATES) {
+        // High-Tech Cyber Crate / Neon Cargo Box
+        const crateGeo = new THREE.BoxGeometry(1.4, 1.35, 1.4);
+        const crateMat = new THREE.MeshStandardMaterial({
+          color: 0x181f30,
+          roughness: 0.4,
+          metalness: 0.7
+        });
+        const crate = new THREE.Mesh(crateGeo, crateMat);
+        crate.position.y = 0.675;
+        group.add(crate);
+
+        // Neon reinforced corner frames
+        const trimGeo = new THREE.BoxGeometry(1.44, 0.08, 0.08);
+        const trimTop = new THREE.Mesh(trimGeo, materials.cyanNeon);
+        trimTop.position.set(0, 1.3, 0.68);
+        group.add(trimTop);
+
+        const trimBottom = new THREE.Mesh(trimGeo, materials.cyanNeon);
+        trimBottom.position.set(0, 0.08, 0.68);
+        group.add(trimBottom);
+
+        // Warning Hazard cross
+        const hazardGeo = new THREE.BoxGeometry(0.75, 0.75, 0.02);
+        const hazard = new THREE.Mesh(hazardGeo, materials.amberNeon);
+        hazard.position.set(0, 0.675, 0.71);
+        group.add(hazard);
+
+        group.hitbox = { width: 1.4, height: 1.35, depth: 1.4 };
+
+      } else if (type === OBSTACLE_TYPES.BARRIER) {
+        // Futuristic Laser Maintenance Barrier
+        const postGeo = new THREE.BoxGeometry(0.25, 1.3, 0.25);
+
+        const leftPost = new THREE.Mesh(postGeo, materials.darkMetal);
+        leftPost.position.set(-0.7, 0.65, 0);
+        group.add(leftPost);
+
+        const rightPost = new THREE.Mesh(postGeo, materials.darkMetal);
+        rightPost.position.set(0.7, 0.65, 0);
+        group.add(rightPost);
+
+        // Amber Hazard Rotating Beacon lights on top of posts
+        const beaconGeo = new THREE.CylinderGeometry(0.12, 0.12, 0.2, 8);
+        const leftBeacon = new THREE.Mesh(beaconGeo, materials.amberNeon);
+        leftBeacon.position.set(-0.7, 1.38, 0);
+        group.add(leftBeacon);
+
+        const rightBeacon = new THREE.Mesh(beaconGeo, materials.amberNeon);
+        rightBeacon.position.set(0.7, 1.38, 0);
+        group.add(rightBeacon);
+
+        // Glowing Pulsing High-Energy Laser Hazard Beam
+        const laserGeo = new THREE.BoxGeometry(1.5, 0.15, 0.15);
+        const laser = new THREE.Mesh(laserGeo, materials.magentaNeon);
+        laser.position.set(0, 0.8, 0);
+        group.add(laser);
+
+        const lowerBarGeo = new THREE.BoxGeometry(1.4, 0.08, 0.08);
+        const lowerBar = new THREE.Mesh(lowerBarGeo, materials.cyanNeon);
+        lowerBar.position.set(0, 0.38, 0);
+        group.add(lowerBar);
+
+        group.hitbox = { width: 1.6, height: 1.4, depth: 0.6 };
+
+      } else {
+        // Small Automated Maglev Train Car / Subway Maintenance Rover
+        const bodyGeo = new THREE.BoxGeometry(1.45, 1.5, 2.7);
+        const bodyMat = new THREE.MeshStandardMaterial({
+          color: 0x131826,
+          roughness: 0.3,
+          metalness: 0.85
+        });
+        const body = new THREE.Mesh(bodyGeo, bodyMat);
+        body.position.y = 0.85;
+        group.add(body);
+
+        // Cockpit canopy windshield
+        const glassGeo = new THREE.BoxGeometry(1.25, 0.48, 0.65);
+        const glass = new THREE.Mesh(glassGeo, materials.cyanNeon);
+        glass.position.set(0, 1.15, 1.05);
+        group.add(glass);
+
+        // Front Headlights
+        const lightGeo = new THREE.BoxGeometry(0.25, 0.16, 0.1);
+        const leftLight = new THREE.Mesh(lightGeo, materials.amberNeon);
+        leftLight.position.set(-0.45, 0.5, 1.36);
+        group.add(leftLight);
+
+        const rightLight = new THREE.Mesh(lightGeo, materials.amberNeon);
+        rightLight.position.set(0.45, 0.5, 1.36);
+        group.add(rightLight);
+
+        // Undercarriage repulsor levitation strip
+        const underGeo = new THREE.BoxGeometry(1.3, 0.06, 2.3);
+        const underGlow = new THREE.Mesh(underGeo, materials.magentaNeon);
+        underGlow.position.set(0, 0.15, 0);
+        group.add(underGlow);
+
+        group.hitbox = { width: 1.5, height: 1.6, depth: 2.7 };
+      }
+
+      return group;
+    }
+
+    // Active obstacle manager
+    const activeObstacles = [];
+    let lastObstacleZ = -32.0;
+
+    /**
+     * Spawns obstacles ahead with fair, playable lane spacing
+     */
+    function spawnObstacleRow(targetZ) {
+      const obstacleCount = Math.random() < 0.3 ? 2 : 1;
+
+      const availableLanes = [0, 1, 2];
+      availableLanes.sort(() => Math.random() - 0.5);
+
+      for (let i = 0; i < obstacleCount; i++) {
+        const laneIndex = availableLanes[i];
+        const laneX = CONFIG.LANE_POSITIONS[laneIndex];
+
+        const typeKeys = [OBSTACLE_TYPES.CRATES, OBSTACLE_TYPES.BARRIER, OBSTACLE_TYPES.TRAIN_CAR];
+        const pickedType = typeKeys[Math.floor(Math.random() * typeKeys.length)];
+
+        const obstacleMesh = createObstacleMesh(pickedType);
+        obstacleMesh.position.set(laneX, 0, targetZ);
+        obstacleMesh.laneIndex = laneIndex;
+        obstacleMesh.obstacleType = pickedType;
+
+        scene.add(obstacleMesh);
+        activeObstacles.push(obstacleMesh);
+      }
+
+      lastObstacleZ = targetZ;
+    }
+
+    function seedInitialObstacles() {
+      let currentZ = -32.0;
+      while (currentZ > -CONFIG.OBSTACLE_SPAWN_DISTANCE) {
+        spawnObstacleRow(currentZ);
+        const gap = CONFIG.MIN_OBSTACLE_GAP + Math.random() * (CONFIG.MAX_OBSTACLE_GAP - CONFIG.MIN_OBSTACLE_GAP);
+        currentZ -= gap;
+      }
+    }
+
+    seedInitialObstacles();
+
+    /* ==========================================================================
+       6. GAME LOOP
+       Accurate aerodynamics velocity integration, speed-FOV camera rush,
+       biomechanical running kinematics, and warp particle flow.
+       ========================================================================== */
+    const gameState = {
+      isRunning: true,
+      isGameOver: false,
+      speedKmh: CONFIG.START_SPEED,       // Current velocity in km/h
+      maxSpeedKmh: CONFIG.START_SPEED,    // Peak velocity reached
+      distanceMeters: 0.0,                // Real physical distance traveled (meters)
+      timeElapsedSeconds: 0.0,            // Time survived in seconds
+      score: 0,                           // Points derived from distance (distance * SCORE_RATE)
+      highScore: parseInt(localStorage.getItem('neon_subway_highscore') || '0', 10),
+      clock: new THREE.Clock(),
+      soundEnabled: true
+    };
+
+    function gameLoop() {
+      requestAnimationFrame(gameLoop);
+
+      const delta = Math.min(gameState.clock.getDelta(), 0.05);
+
+      if (gameState.isRunning && !gameState.isGameOver) {
+        // 1. Aerodynamic Velocity Integration:
+        // a(v) = a_max * (1 - (v / v_max)^1.5)
+        const speedRatio = Math.min(gameState.speedKmh / CONFIG.MAX_SPEED, 0.999);
+        const currentAcceleration = CONFIG.SPEED_INCREASE_RATE * Math.pow(1.0 - speedRatio, 1.2);
+        gameState.speedKmh += currentAcceleration * delta;
+        if (gameState.speedKmh > CONFIG.MAX_SPEED) gameState.speedKmh = CONFIG.MAX_SPEED;
+
+        if (gameState.speedKmh > gameState.maxSpeedKmh) {
+          gameState.maxSpeedKmh = gameState.speedKmh;
+        }
+
+        // 2. Metric Physics: 1 km/h = 1 / 3.6 m/s
+        const speedMps = gameState.speedKmh / 3.6;
+
+        // Exact distance traveled this frame: Δd = v * Δt
+        const frameDistanceMeters = speedMps * delta;
+        gameState.distanceMeters += frameDistanceMeters;
+        gameState.timeElapsedSeconds += delta;
+        gameState.score = Math.floor(gameState.distanceMeters * CONFIG.SCORE_RATE);
+
+        // 3. Scroll and recycle elevated subway & cityscape segments
+        trackSegments.forEach((segment) => {
+          segment.position.z += frameDistanceMeters;
+          if (segment.position.z > 24.0) {
+            segment.position.z -= totalTrackLength;
+          }
+        });
+
+        // 4. Stream floating warp dust particles through the metropolis
+        const pPositions = particleGeometry.attributes.position.array;
+        const particleSpeed = speedMps * 1.35;
+        for (let i = 0; i < PARTICLE_COUNT; i++) {
+          pPositions[i * 3 + 2] += particleSpeed * delta;
+          if (pPositions[i * 3 + 2] > 10.0) {
+            pPositions[i * 3 + 2] = -125.0 - Math.random() * 20.0;
+            pPositions[i * 3 + 0] = (Math.random() - 0.5) * 12.0;
+            pPositions[i * 3 + 1] = Math.random() * 6.5 + 0.3;
+          }
+        }
+        particleGeometry.attributes.position.needsUpdate = true;
+
+        // 5. Update and recycle obstacles
+        lastObstacleZ += frameDistanceMeters;
+
+        for (let i = activeObstacles.length - 1; i >= 0; i--) {
+          const obs = activeObstacles[i];
+          obs.position.z += frameDistanceMeters;
+
+          if (obs.position.z > CONFIG.OBSTACLE_DESPAWN_Z) {
+            scene.remove(obs);
+            activeObstacles.splice(i, 1);
+          }
+        }
+
+        while (lastObstacleZ > -CONFIG.OBSTACLE_SPAWN_DISTANCE) {
+          const speedFactor = (gameState.speedKmh / CONFIG.START_SPEED);
+          const dynamicGap = Math.max(
+            CONFIG.MIN_OBSTACLE_GAP,
+            CONFIG.MIN_OBSTACLE_GAP * speedFactor * 0.85 + Math.random() * (CONFIG.MAX_OBSTACLE_GAP - CONFIG.MIN_OBSTACLE_GAP)
+          );
+          const nextZ = lastObstacleZ - dynamicGap;
+          spawnObstacleRow(nextZ);
+        }
+
+        // 6. Smooth Quintic Lane Switching with Roll Banking & Yaw Steering
+        if (playerState.isChangingLane) {
+          playerState.transitionProgress += delta / CONFIG.LANE_CHANGE_DURATION;
+          if (playerState.transitionProgress >= 1.0) {
+            playerState.transitionProgress = 1.0;
+            playerState.isChangingLane = false;
+            playerState.currentLane = playerState.targetLane;
+            player.position.x = playerState.targetX;
+            player.rotation.z = 0;
+            player.rotation.y = 0;
+          } else {
+            const t = playerState.transitionProgress;
+            const smoothT = t * t * t * (t * (t * 6 - 15) + 10);
+            player.position.x = THREE.MathUtils.lerp(playerState.startX, playerState.targetX, smoothT);
+
+            const direction = Math.sign(playerState.targetX - playerState.startX);
+            const roll = Math.sin(t * Math.PI) * CONFIG.PLAYER_TILT_ANGLE * -direction;
+            player.rotation.z = roll;
+
+            const yaw = Math.sin(t * Math.PI) * CONFIG.PLAYER_YAW_ANGLE * direction;
+            player.rotation.y = yaw;
+          }
+        }
+
+        // 7. Biomechanical Runner Gait Kinematics
+        const strideFrequency = CONFIG.BASE_STRIDE_FREQUENCY + (speedMps * CONFIG.STRIDE_VELOCITY_SCALE);
+        playerState.runStridePhase += delta * strideFrequency * Math.PI * 2.0;
+        const phase = playerState.runStridePhase;
+
+        const bounce = Math.abs(Math.sin(phase)) * CONFIG.PLAYER_BOB_AMPLITUDE;
+        const speedLean = 0.12 + (speedMps / 25.0) * 0.18;
+        playerTorso.position.y = 0.95 + bounce;
+        playerTorso.rotation.x = speedLean;
+        playerTorso.rotation.y = Math.sin(phase) * 0.08;
+
+        // Articulated Leg Kinematics (Hip swing + Knee flexion)
+        const legSwing = Math.sin(phase) * 0.65;
+        leftThigh.rotation.x = legSwing;
+        rightThigh.rotation.x = -legSwing;
+
+        leftCalf.rotation.x = legSwing < 0 ? -legSwing * 1.1 : 0.05;
+        rightCalf.rotation.x = -legSwing < 0 ? legSwing * 1.1 : 0.05;
+
+        // Articulated Arm Kinematics (Opposite phase to legs + 80 degree elbow bend)
+        const armSwing = Math.sin(phase) * 0.6;
+        leftUpperArm.rotation.x = -armSwing;
+        rightUpperArm.rotation.x = armSwing;
+        leftForearm.rotation.x = 0.85 + Math.abs(armSwing) * 0.25;
+        rightForearm.rotation.x = 0.85 + Math.abs(armSwing) * 0.25;
+
+        // Dynamic Thruster Flame Flicker
+        const flamePulse = 1.0 + Math.sin(phase * 4.0) * 0.35 + (playerState.isChangingLane ? 0.6 : 0.0);
+        leftThrusterGlow.scale.set(1.0, flamePulse, 1.0);
+        rightThrusterGlow.scale.set(1.0, flamePulse, 1.0);
+
+        // 8. Check for collisions
+        checkCollisions();
+
+        // 9. Update HUD
+        updateHUD(speedMps);
+      }
+
+      // 10. Dynamic Speed Camera Rush (FOV widens with velocity)
+      const speedNorm = (gameState.speedKmh - CONFIG.START_SPEED) / (CONFIG.MAX_SPEED - CONFIG.START_SPEED);
+      const targetFOV = THREE.MathUtils.lerp(CONFIG.BASE_CAMERA_FOV, CONFIG.MAX_CAMERA_FOV, Math.max(0, speedNorm));
+      camera.fov = THREE.MathUtils.damp(camera.fov, targetFOV, 4.0, delta);
+      camera.updateProjectionMatrix();
+
+      // Camera smooth horizontal tracking
+      const desiredCamX = player.position.x * 0.45;
+      camera.position.x = THREE.MathUtils.damp(camera.position.x, desiredCamX, CONFIG.CAMERA_SMOOTH_FACTOR, delta);
+      camera.position.y = CONFIG.CAMERA_OFFSET.y;
+      camera.position.z = CONFIG.CAMERA_OFFSET.z;
+
+      const lookTargetX = player.position.x * 0.2;
+      camera.lookAt(lookTargetX, CONFIG.CAMERA_LOOK_OFFSET.y, CONFIG.CAMERA_LOOK_OFFSET.z);
+
+      // Render
+      renderer.render(scene, camera);
+    }
+
+    /* ==========================================================================
+       7. COLLISIONS
+       Accurate AABB check. Touches in same lane end run immediately.
+       ========================================================================== */
+    function checkCollisions() {
+      const playerPos = player.position;
+      const playerRadius = 0.42;
+      const playerZMin = playerPos.z - 0.32;
+      const playerZMax = playerPos.z + 0.32;
+
+      for (let i = 0; i < activeObstacles.length; i++) {
+        const obs = activeObstacles[i];
+        const halfWidth = obs.hitbox.width * 0.5;
+        const halfDepth = obs.hitbox.depth * 0.5;
+
+        const obsXMin = obs.position.x - halfWidth;
+        const obsXMax = obs.position.x + halfWidth;
+        const obsZMin = obs.position.z - halfDepth;
+        const obsZMax = obs.position.z + halfDepth;
+
+        const xOverlap = (playerPos.x + playerRadius > obsXMin) && (playerPos.x - playerRadius < obsXMax);
+        const zOverlap = (playerZMax > obsZMin) && (playerZMin < obsZMax);
+
+        if (xOverlap && zOverlap) {
+          triggerGameOver();
+          break;
+        }
+      }
+    }
+
+    function triggerGameOver() {
+      if (gameState.isGameOver) return;
+      gameState.isGameOver = true;
+      gameState.isRunning = false;
+
+      playCrashSound();
+      pauseBackgroundMusic();
+
+      // Recoil camera impact shake
+      camera.position.y += 0.35;
+      camera.position.x += (Math.random() - 0.5) * 0.45;
+
+      let isNewHigh = false;
+      if (gameState.score > gameState.highScore) {
+        gameState.highScore = gameState.score;
+        localStorage.setItem('neon_subway_highscore', gameState.highScore.toString());
+        isNewHigh = true;
+      }
+
+      const finalDistanceM = gameState.distanceMeters.toFixed(1);
+      const finalTimeS = gameState.timeElapsedSeconds.toFixed(1);
+      const avgSpeedKmh = gameState.timeElapsedSeconds > 0.05
+        ? ((gameState.distanceMeters / gameState.timeElapsedSeconds) * 3.6).toFixed(1)
+        : Math.round(gameState.speedKmh);
+
+      document.getElementById('game-over-score').textContent = `${gameState.score.toLocaleString()} pts`;
+      document.getElementById('game-over-dist').textContent = `${finalDistanceM} m`;
+      document.getElementById('game-over-time').textContent = `${finalTimeS} s`;
+      document.getElementById('game-over-speed').textContent = `${Math.round(gameState.maxSpeedKmh)} km/h`;
+      document.getElementById('game-over-avg').textContent = `${avgSpeedKmh} km/h`;
+      document.getElementById('new-high-badge').style.display = isNewHigh ? 'block' : 'none';
+
+      document.getElementById('game-over-overlay').classList.add('visible');
+    }
+
+    /* ==========================================================================
+       8. INPUT
+       Keyboard & touch swipe controls for switching lanes & restarting
+       ========================================================================== */
+    function moveLane(direction) {
+      if (gameState.isGameOver || !gameState.isRunning) return;
+
+      const newLane = playerState.targetLane + direction;
+      if (newLane >= 0 && newLane <= 2) {
+        playerState.startX = player.position.x;
+        playerState.targetLane = newLane;
+        playerState.targetX = CONFIG.LANE_POSITIONS[newLane];
+        playerState.transitionProgress = 0.0;
+        playerState.isChangingLane = true;
+
+        playLaneChangeSound();
+      }
+    }
+
+    window.addEventListener('keydown', (e) => {
+      resumeAudioContext();
+
+      if (e.code === 'ArrowLeft' || e.code === 'KeyA') {
+        moveLane(-1);
+      } else if (e.code === 'ArrowRight' || e.code === 'KeyD') {
+        moveLane(1);
+      } else if (e.code === 'KeyR' || (e.code === 'Space' && gameState.isGameOver)) {
+        if (gameState.isGameOver) {
+          restartGame();
+        }
+      }
+    });
+
+    document.getElementById('btn-left').addEventListener('click', (e) => {
+      e.stopPropagation();
+      resumeAudioContext();
+      moveLane(-1);
+    });
+
+    document.getElementById('btn-right').addEventListener('click', (e) => {
+      e.stopPropagation();
+      resumeAudioContext();
+      moveLane(1);
+    });
+
+    let touchStartX = 0;
+    let touchStartY = 0;
+    window.addEventListener('touchstart', (e) => {
+      resumeAudioContext();
+      if (e.touches.length > 0) {
+        touchStartX = e.touches[0].clientX;
+        touchStartY = e.touches[0].clientY;
+      }
+    }, { passive: true });
+
+    window.addEventListener('touchend', (e) => {
+      if (e.changedTouches.length > 0) {
+        const diffX = e.changedTouches[0].clientX - touchStartX;
+        const diffY = e.changedTouches[0].clientY - touchStartY;
+        if (Math.abs(diffX) > 28 && Math.abs(diffX) > Math.abs(diffY)) {
+          if (diffX < 0) moveLane(-1);
+          else moveLane(1);
+        }
+      }
+    }, { passive: true });
+
+    /* ==========================================================================
+       9. UI & PROCEDURAL AUDIO
+       HUD metrics updates, High Score display, and procedural Web Audio API
+       synthesizer (Zero downloaded audio files, 100% offline capable).
+       ========================================================================== */
+    const hudScoreEl = document.getElementById('hud-score');
+    const hudDistanceEl = document.getElementById('hud-distance');
+    const hudHighscoreEl = document.getElementById('hud-highscore');
+    const hudSpeedEl = document.getElementById('hud-speed');
+    const hudSpeedSubEl = document.getElementById('hud-speed-sub');
+    const audioBtn = document.getElementById('audio-btn');
+    const audioIcon = document.getElementById('audio-icon');
+
+    hudHighscoreEl.textContent = `BEST: ${gameState.highScore.toLocaleString()} pts`;
+
+    function updateHUD(speedMps) {
+      hudScoreEl.textContent = `${gameState.score.toLocaleString()} pts`;
+      hudDistanceEl.textContent = `${gameState.distanceMeters.toFixed(1)} m`;
+      hudSpeedEl.textContent = Math.round(gameState.speedKmh).toString();
+      hudSpeedSubEl.innerHTML = `<span>KM/H</span> <span>(${speedMps.toFixed(1)} m/s)</span>`;
+      hudHighscoreEl.textContent = `BEST: ${Math.max(gameState.highScore, gameState.score).toLocaleString()} pts`;
+
+      const speedRatio = (gameState.speedKmh - CONFIG.START_SPEED) / (CONFIG.MAX_SPEED - CONFIG.START_SPEED);
+      speedVignette.style.opacity = (0.2 + speedRatio * 0.6).toFixed(2);
+    }
+
+    // --- Background Music ("Toward the Hidden Horizon") ---
+    const bgMusic = new Audio(CONFIG.BGM_PATH);
+    bgMusic.loop = true;
+    bgMusic.volume = CONFIG.BGM_VOLUME;
+    bgMusic.preload = 'auto';
+
+    function startBackgroundMusic() {
+      if (!gameState.soundEnabled) return;
+      if (bgMusic.paused) {
+        const playPromise = bgMusic.play();
+        if (playPromise !== undefined) {
+          playPromise.catch(() => {
+            // Autoplay restrictions: will smoothly begin on first keypress, click, or swipe
+          });
+        }
+      }
+    }
+
+    function pauseBackgroundMusic() {
+      if (!bgMusic.paused) {
+        bgMusic.pause();
+      }
+    }
+
+    // --- Web Audio API Procedural Synthesizer for SFX ---
+    let audioCtx = null;
+
+    function initAudioContext() {
+      if (!audioCtx) {
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        if (AudioContextClass) {
+          audioCtx = new AudioContextClass();
+        }
+      }
+    }
+
+    function resumeAudioContext() {
+      initAudioContext();
+      if (audioCtx && audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+      startBackgroundMusic();
+    }
+
+    function playLaneChangeSound() {
+      if (!gameState.soundEnabled) return;
+      resumeAudioContext();
+      if (!audioCtx) return;
+
+      try {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'sine';
+
+        const now = audioCtx.currentTime;
+        osc.frequency.setValueAtTime(380, now);
+        osc.frequency.exponentialRampToValueAtTime(780, now + 0.12);
+
+        gain.gain.setValueAtTime(0.12, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+
+        osc.start(now);
+        osc.stop(now + 0.12);
+      } catch (err) {
+        // Restricted browser safety
+      }
+    }
+
+    function playCrashSound() {
+      if (!gameState.soundEnabled) return;
+      resumeAudioContext();
+      if (!audioCtx) return;
+
+      try {
+        const now = audioCtx.currentTime;
+
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(150, now);
+        osc.frequency.exponentialRampToValueAtTime(25, now + 0.38);
+
+        gain.gain.setValueAtTime(0.32, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.38);
+
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+
+        osc.start(now);
+        osc.stop(now + 0.38);
+      } catch (err) {
+        // Silently ignore audio errors
+      }
+    }
+
+    audioBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      gameState.soundEnabled = !gameState.soundEnabled;
+      audioIcon.textContent = gameState.soundEnabled ? '🔊' : '🔇';
+      if (gameState.soundEnabled) {
+        resumeAudioContext();
+        startBackgroundMusic();
+      } else {
+        pauseBackgroundMusic();
+      }
+    });
+
+    /* ==========================================================================
+       10. RESTART
+       Cleans up active obstacles, resets player lane position, resets speeds,
+       and restarts the game loop cleanly.
+       ========================================================================== */
+    function restartGame() {
+      activeObstacles.forEach((obs) => {
+        scene.remove(obs);
+      });
+      activeObstacles.length = 0;
+
+      playerState.currentLane = CONFIG.DEFAULT_LANE_INDEX;
+      playerState.targetLane = CONFIG.DEFAULT_LANE_INDEX;
+      playerState.startX = CONFIG.LANE_POSITIONS[CONFIG.DEFAULT_LANE_INDEX];
+      playerState.targetX = CONFIG.LANE_POSITIONS[CONFIG.DEFAULT_LANE_INDEX];
+      playerState.transitionProgress = 1.0;
+      playerState.isChangingLane = false;
+      playerState.runStridePhase = 0.0;
+
+      player.position.set(CONFIG.LANE_POSITIONS[CONFIG.DEFAULT_LANE_INDEX], 0, 0);
+      player.rotation.set(0, 0, 0);
+
+      gameState.speedKmh = CONFIG.START_SPEED;
+      gameState.maxSpeedKmh = CONFIG.START_SPEED;
+      gameState.distanceMeters = 0.0;
+      gameState.timeElapsedSeconds = 0.0;
+      gameState.score = 0;
+      gameState.isGameOver = false;
+      gameState.isRunning = true;
+      gameState.clock.start();
+
+      lastObstacleZ = -32.0;
+      seedInitialObstacles();
+
+      document.getElementById('game-over-overlay').classList.remove('visible');
+      updateHUD(CONFIG.START_SPEED / 3.6);
+
+      if (gameState.soundEnabled) {
+        bgMusic.currentTime = 0;
+        startBackgroundMusic();
+      }
+    }
+
+    document.getElementById('restart-btn').addEventListener('click', () => {
+      restartGame();
+    });
+
+    // Start background music & game loop
+    startBackgroundMusic();
+    gameState.clock.start();
+    gameLoop();
+  </script>
+</body>
+</html>
